@@ -1,0 +1,54 @@
+version: "3.7"
+
+services:
+  mysql:
+    build:
+      context: ./mysql
+    image: ${PROJECT_NAME}-mysql
+    container_name: ${PROJECT_NAME}-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root}
+      - MYSQL_DATABASE=${MYSQL_DATABASE_NAME}
+      - MYSQL_USER=${MYSQL_USER:-root}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-root}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/data:/var/lib/mysql
+    restart: on-failure
+
+  php-fpm:
+    build:
+      context: ./php-fpm
+    image: ${PROJECT_NAME}-php-fpm
+    container_name: ${PROJECT_NAME}-php-fpm
+    depends_on:
+      - mysql
+    environment:
+      - APP_ENV=${APP_ENV}
+      - APP_SECRET=${APP_SECRET}
+      - DATABASE_URL=mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE_NAME}?serverVersion=5.7
+    volumes:
+      - ../app:/var/www
+    restart: on-failure
+
+  nginx:
+    build:
+      context: ./nginx
+    image: ${PROJECT_NAME}-nginx
+    container_name: ${PROJECT_NAME}-nginx
+    depends_on:
+      - php-fpm
+    volumes:
+      - ../app:/var/www
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/sites/:/etc/nginx/sites-available
+      - ./nginx/conf.d/:/etc/nginx/conf.d
+      - ./logs:/var/log
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: on-failure
+
+    
